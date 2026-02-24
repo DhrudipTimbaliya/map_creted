@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
+import 'package:map_creted/constant/ColorsConstant.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../controller/map_tap_info_controller.dart';
-
 
 class PlaceDetailBottomSheet extends StatelessWidget {
   const PlaceDetailBottomSheet({super.key});
@@ -13,16 +13,15 @@ class PlaceDetailBottomSheet extends StatelessWidget {
 
     return DraggableScrollableSheet(
       initialChildSize: 0.4,
-      minChildSize: 0.2,
+      minChildSize: 0.0, // ફેરફાર: આને 0.0 રાખવું જેથી શીટ બંધ થઈ શકે
       maxChildSize: 0.9,
       snap: true,
       builder: (context, scrollController) {
         return NotificationListener<DraggableScrollableNotification>(
           onNotification: (notification) {
-            // જો શીટ 0.0 એટલે કે સાવ નીચે પહોંચી જાય, તો કંટ્રોલરમાં સ્ટેટ ફોલ્સ કરો
             if (notification.extent <= 0.0) {
               controller.isBottomSheetOpen.value = false;
-              controller.closeBottomSheet(); // આ માર્કર અને ડેટા ક્લિયર કરશે
+              controller.closeBottomSheet();
             }
             return true;
           },
@@ -32,88 +31,206 @@ class PlaceDetailBottomSheet extends StatelessWidget {
               borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
               boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
             ),
-          child: Obx(() {
-            if (controller.isLoading.value) {
-              return const Center(child: CircularProgressIndicator());
-            }
+            child: Obx(() {
+              // જો લોડિંગ થતું હોય તો માત્ર લોડર બતાવો, જૂની શીટનો ડેટા નહીં
+              if (controller.isLoading.value) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+              }
 
-            final place = controller.selectedPlace.value;
-            if (place == null) return const SizedBox.shrink();
+              final place = controller.selectedPlace.value;
+              // જો પ્લેસ નલ હોય તો કશું જ ન બતાવો
+              if (place == null) return const SizedBox.shrink();
 
-            return ListView(
-              controller: scrollController,
-              padding: EdgeInsets.zero,
-              children: [
-                Center(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 12),
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(10),
+              return ListView(
+                controller: scrollController,
+                padding: EdgeInsets.zero,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 12),
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
-                ),
-                // 1. Top Image
-                if (place.photoUrl != null)
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-                    child: Image.network(place.photoUrl!, height: 200, width: double.infinity, fit: BoxFit.cover),
-                  ),
 
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 2. Name & Rating
-                      Text(place.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 20),
-                          Text(" ${place.rating ?? 0} (${place.totalRatings ?? 0} reviews)"),
-                          const Spacer(),
-                          _buildStatusBadge(place.isOpen),
-                        ],
+                  // 1. Multiple Photos (Horizontal Scroll)
+                  if (place.photoUrls != null && place.photoUrls!.isNotEmpty)
+                    SizedBox(
+                      height: 220, // ફોટાની હાઇટ
+                      child: PageView.builder(
+                        itemCount: place.photoUrls!.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                            child: ClipRRect(
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                              child: Image.network(
+                                place.photoUrls![index],
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                const Center(child: Icon(Icons.image_not_supported)),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(height: 15),
-                      Text(place.address, style: TextStyle(color: Colors.grey[600])),
-                      const Divider(height: 30),
+                    ),
 
-                      // 3. Action Buttons
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildActionBtn(Icons.directions, "Directions", Colors.blue, controller.drawRouteToPlace),
-                          _buildActionBtn(Icons.call, "Call", Colors.green, () {}),
-                          _buildActionBtn(Icons.public, "Website", Colors.orange, () {}),
-                        ],
-                      ),
-                      const Divider(height: 30),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(place.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Icon(Icons.star, color: Colors.amber, size: 20),
+                            Text(" ${place.rating ?? 0} (${place.totalRatings ?? 0} reviews)"),
+                            const Spacer(),
+                            _buildStatusBadge(place.isOpen),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                        Text(place.address, style: TextStyle(color: Colors.grey[600])),
+                        const Divider(height: 30),
 
-                      // 4. Reviews List
-                      const Text("Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 10),
-                      ...place.reviews.map((review) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(review.authorName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(review.text),
-                        trailing: Text("${review.rating} ★"),
-                      )),
-                    ],
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildActionBtn(Icons.directions, "Directions", Colors.blue, controller.drawRouteToPlace),
+                            _buildActionBtn(Icons.call, "Call", Colors.green, () {}),
+                            _buildActionBtn(
+                              Icons.public,
+                              "Website",
+                              Colors.orange,
+                                  () {
+                                if (place.website != null && place.website!.isNotEmpty) {
+                                  _launchWebsite(place.website!);
+                                } else {
+                                  Get.snackbar(
+                                    "Info",
+                                    "Website not available",
+                                    backgroundColor: Colors.grey.shade800,
+                                    colorText: Colors.white,
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 30),
+
+                        const Text(
+                          "Reviews",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 10),
+
+                        if (place.reviews.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8.0),
+                            child: Text(
+                              "No reviews available.",
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ),
+
+                        ...place.reviews.map(
+                              (review) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Avatar
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: AppColor.black,
+                                  child: Text(
+                                    review.authorName.isNotEmpty
+                                        ? review.authorName[0].toUpperCase()
+                                        : "?",
+                                    style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 12),
+
+                                // Review content
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Author Name & Rating
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            review.authorName,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.star, color: Colors.amber, size: 16),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                review.rating.toStringAsFixed(1),
+                                                style: const TextStyle(fontSize: 14),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+
+                                      const SizedBox(height: 4),
+
+                                      // Review Text
+                                      Text(
+                                        review.text,
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+
+                                      const SizedBox(height: 2),
+
+                                      // Relative Time
+                                      Text(
+                                        review.relativeTime,
+                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            );
-          }),
-        ),
+                ],
+              );
+            }),
+          ),
         );
       },
     );
   }
 
+  // _buildStatusBadge અને _buildActionBtn પદ્ધતિઓ તમારા જૂના કોડ મુજબ જ રહેશે...
   Widget _buildStatusBadge(bool? isOpen) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -137,5 +254,24 @@ class PlaceDetailBottomSheet extends StatelessWidget {
         ],
       ),
     );
+  }
+
+
+
+  Future<void> _launchWebsite(String url) async {
+    try {
+      final Uri uri = Uri.parse(url.startsWith('http') ? url : 'https://$url');
+
+      if (!await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      )) {
+        Get.snackbar("Error", "Cannot open the website",
+            backgroundColor: Colors.red, colorText: Colors.white);
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Website launch failed: $e",
+          backgroundColor: Colors.red, colorText: Colors.white);
+    }
   }
 }

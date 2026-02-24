@@ -4,7 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:dio/dio.dart' as dio_pkg; // dio package use
+import 'package:dio/dio.dart' as dio_pkg;
 
 import '../api/place_serviece.dart';
 import '../model/place_model.dart';
@@ -40,9 +40,10 @@ class MapTapInfoController extends GetxController {
     return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
   }
 
-  // --- REPLACED: onPoiTap removed, handleMapTap used ---
-  // આ મેથડ PointOfInterest પેરામીટર વગર કામ કરે છે
+  // --- આ મેથડ સર્ચ અને ટેપ બંને માટે કોમન લોજિક વાપરે છે ---
   void handleMapTap(LatLng latLng) async {
+    // ૧. જૂનો ડેટા અને શીટ તરત જ બંધ કરો જેથી ડબલ શીટ ન દેખાય
+    isBottomSheetOpen.value = false;
     _clearMarkers();
     polylines.clear();
     selectedPlace.value = null;
@@ -51,52 +52,49 @@ class MapTapInfoController extends GetxController {
     isLoading.value = true;
 
     try {
-      // ૧. LatLng પરથી Place ID મેળવવા Reverse Geocoding API call
+      // ૨. Reverse Geocoding થી Place ID મેળવો
       final response = await _dio.get(
         "https://maps.googleapis.com/maps/api/geocode/json",
         queryParameters: {
           'latlng': "${latLng.latitude},${latLng.longitude}",
-          'key': _placesService.apiKey, // PlacesService માંથી API Key લેશે
+          'key': _placesService.apiKey,
         },
       );
 
       if (response.data['status'] == 'OK' && response.data['results'].isNotEmpty) {
-        // ૨. સૌથી સચોટ Place ID મેળવો
         String placeId = response.data['results'][0]['place_id'];
         String placeName = response.data['results'][0]['formatted_address'].split(',')[0];
 
         // ૩. માર્કર એડ કરો
         _addMarker(latLng, placeName);
 
-        // ૪. Exact Place Details ફેચ કરો
+        // ૪. વિગતો ફેચ કરો
         await fetchPlaceDetails(placeId);
 
-        // ૫. શીટ ઓપન કરો
+        // ૫. ડેટા આવી ગયા પછી જ શીટ ઓપન કરો
         openBottomSheet();
       } else {
-        Get.snackbar("Notice", "No place details found at this location.");
+        Get.snackbar("Notice", "No place details found.");
       }
     } catch (e) {
-      Get.snackbar("Error", "Failed to fetch location info.");
+      print("Error: $e");
     } finally {
       isLoading.value = false;
     }
   }
 
   Future<void> fetchPlaceDetails(String placeId) async {
-    isLoading.value = true;
     try {
       selectedPlace.value = await _placesService.getPlaceDetails(placeId);
     } catch (e) {
-      Get.snackbar("Error", e.toString());
-    } finally {
-      isLoading.value = false;
+      selectedPlace.value = null;
+      Get.snackbar("Error", "વિગત મેળવવામાં ભૂલ થઈ.");
     }
   }
 
   void _addMarker(LatLng position, String title) {
     findPLaceController.markers.add(Marker(
-      markerId: MarkerId("manual_poi_${position.latitude}"),
+      markerId: MarkerId("poi_${position.latitude}_${position.longitude}"),
       position: position,
       icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
       infoWindow: InfoWindow(title: title),
@@ -109,13 +107,18 @@ class MapTapInfoController extends GetxController {
     findPLaceController.markers.refresh();
   }
 
-  void openBottomSheet() => isBottomSheetOpen.value = true;
+  void openBottomSheet() {
+    if (selectedPlace.value != null) {
+      isBottomSheetOpen.value = true;
+    }
+  }
 
   void closeBottomSheet() {
     isBottomSheetOpen.value = false;
     _clearMarkers();
     polylines.clear();
     selectedPlace.value = null;
+    selectedLatLng.value = null;
   }
 
   Future<void> drawRouteToPlace() async {
@@ -136,6 +139,7 @@ class MapTapInfoController extends GetxController {
 
     if (result.points.isNotEmpty) {
       List<LatLng> polylineCoordinates = result.points.map((p) => LatLng(p.latitude, p.longitude)).toList();
+      polylines.clear(); // જૂનો રસ્તો સાફ કરો
       polylines.add(Polyline(
         polylineId: const PolylineId("route"),
         color: const Color(0xFF2196F3),
