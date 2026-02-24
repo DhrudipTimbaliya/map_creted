@@ -12,7 +12,8 @@ import '../project_specific/contine_the_map_data.dart';
 import '../project_specific/serch_location.dart';
 
 class DirectionPage extends StatefulWidget {
-  const DirectionPage({super.key});
+  final passeddirection;
+  const DirectionPage({super.key,this.passeddirection});
 
   @override
   State<DirectionPage> createState() => _DirectionPageState();
@@ -41,7 +42,18 @@ class _DirectionPageState extends State<DirectionPage> {
     Get.put(SuggestionController(), tag: 'start');
     Get.put(SuggestionController(), tag: 'end');
     Get.put(MapController());
+    if (widget.passeddirection != null && widget.passeddirection!.isNotEmpty) {
+      // Set starting location text
+      _searchFirstPlace.text = "Your Location";
 
+      // Set destination location text
+      _searchSecondPlace.text = widget.passeddirection!;
+
+      // Update map points in controller
+      // true = starting point, false = destination
+      mapDataController.setPoint(_searchFirstPlace.text, true);
+      mapDataController.setPoint(_searchSecondPlace.text, false);
+    }
     // Optional: auto-get current location as start
     // mapDataController.getCurrentLocation();
   }

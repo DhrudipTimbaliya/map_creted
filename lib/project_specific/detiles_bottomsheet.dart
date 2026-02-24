@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:map_creted/constant/ColorsConstant.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../Pages/direction_page.dart';
 import '../controller/map_tap_info_controller.dart';
+import 'gallary_images.dart';
 
 class PlaceDetailBottomSheet extends StatelessWidget {
   const PlaceDetailBottomSheet({super.key});
@@ -62,27 +64,55 @@ class PlaceDetailBottomSheet extends StatelessWidget {
                     ),
                   ),
 
-                  // 1. Multiple Photos (Horizontal Scroll)
-                  if (place.photoUrls != null && place.photoUrls!.isNotEmpty)
-                    SizedBox(
-                      height: 220, // ફોટાની હાઇટ
-                      child: PageView.builder(
-                        itemCount: place.photoUrls!.length,
-                        itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-                              child: Image.network(
-                                place.photoUrls![index],
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                const Center(child: Icon(Icons.image_not_supported)),
-                              ),
+                  if (place.photoUrls.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        height: 180, // હાઇટ થોડી વધારી જેથી મોટા ફોટા વ્યવસ્થિત દેખાય
+                        child: Row(
+                          children: [
+                            // ૧. પ્રથમ મોટો ફોટો (Expandable)
+                            Expanded(
+                              flex: 2,
+                              child: _buildImageTile(place.photoUrls[0], index: 0, allPhotos: place.photoUrls),
                             ),
-                          );
-                        },
+                            const SizedBox(width: 8),
+
+                            // ૨. બીજો મધ્યમ ફોટો
+                            if (place.photoUrls.length > 1)
+                              Expanded(
+                                flex: 1,
+                                child: _buildImageTile(place.photoUrls[1], index: 1, allPhotos: place.photoUrls),
+                              ),
+                            const SizedBox(width: 8),
+
+                            // ૩. છેલ્લા નાના ફોટાઓની કોલમ (ગ્રીડ જેવું લુક)
+                            if (place.photoUrls.length > 2)
+                              Expanded(
+                                flex: 1,
+                                child: Column(
+                                  children: [
+                                    // ત્રીજો ફોટો
+                                    Expanded(child: _buildImageTile(place.photoUrls[2], index: 2, allPhotos: place.photoUrls)),
+                                    const SizedBox(height: 4),
+                                    // ચોથો ફોટો
+                                    if (place.photoUrls.length > 3)
+                                      Expanded(child: _buildImageTile(place.photoUrls[3], index: 3, allPhotos: place.photoUrls)),
+                                    const SizedBox(height: 4),
+                                    // પાંચમો ફોટો અથવા 'More' ઓપ્શન
+                                    if (place.photoUrls.length > 4)
+                                      Expanded(
+                                        child: _buildMoreTile(
+                                          place.photoUrls[4],
+                                          count: place.photoUrls.length - 4,
+                                          allPhotos: place.photoUrls,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
 
@@ -108,7 +138,12 @@ class PlaceDetailBottomSheet extends StatelessWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _buildActionBtn(Icons.directions, "Directions", Colors.blue, controller.drawRouteToPlace),
+                            _buildActionBtn(Icons.directions,
+                                "Directions",
+                                Colors.blue,
+                                (){
+                                   Get.to(()=>DirectionPage(passeddirection: place.name));
+                                }),
                             _buildActionBtn(Icons.call, "Call", Colors.green, () {}),
                             _buildActionBtn(
                               Icons.public,
@@ -274,4 +309,43 @@ class PlaceDetailBottomSheet extends StatelessWidget {
           backgroundColor: Colors.red, colorText: Colors.white);
     }
   }
+
+// સામાન્ય ઈમેજ ટાઈલ માટે
+Widget _buildImageTile(String url, {required int index, required List<String> allPhotos}) {
+  return GestureDetector(
+    onTap: () => Get.to(() => FullGalleryPage(photoUrls: allPhotos, initialIndex: index)),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.network(url, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+    ),
+  );
+}
+
+// 'More' વાળી ઈમેજ ટાઈલ માટે
+Widget _buildMoreTile(String url, {required int count, required List<String> allPhotos}) {
+  return GestureDetector(
+    onTap: () => Get.to(() => FullGalleryPage(photoUrls: allPhotos)),
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(url, fit: BoxFit.cover),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Text(
+              "+$count",
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 }
