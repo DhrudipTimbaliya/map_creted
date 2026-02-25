@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -35,7 +36,7 @@ class _DirectionPageState extends State<DirectionPage> {
   final mapDataChange =Get.put(MapDataSelectedController());
   // GlobalKey to control ExpansionTile state
   final GlobalKey _expansionTileKey = GlobalKey();
-
+   final Key _mapKey = UniqueKey();
   @override
   void initState() {
     super.initState();
@@ -78,6 +79,7 @@ class _DirectionPageState extends State<DirectionPage> {
             /// MAP - full screen
             Obx(
                   () => GoogleMap(
+                    key: _mapKey,
                 initialCameraPosition: initialPosition,
                 mapType: mapDataChange.selectedMapType.value,
                 myLocationEnabled: true,
@@ -101,8 +103,19 @@ class _DirectionPageState extends State<DirectionPage> {
               top: 150,
               right: 16,
               child: GestureDetector(
-                onTap: () {
-                  locationController.goToCurrentLocation();
+                onTap: () async {
+                  // Direct call approach
+                  try {
+                    Position position = await Geolocator.getCurrentPosition();
+                    mapDataController.mapController?.animateCamera(
+                      CameraUpdate.newLatLngZoom(
+                        LatLng(position.latitude, position.longitude),
+                        15,
+                      ),
+                    );
+                  } catch (e) {
+                    print(e);
+                  }
                 },
                 child: Container(
                   height: 50,

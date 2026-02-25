@@ -34,6 +34,19 @@ class _HomePageState extends State<HomePage> {
     zoom: 14,
   );
 
+
+  // 1. Define a Key variable
+  Key mapKey = UniqueKey();
+
+  // 2. Create a function to refresh the map
+  void refreshMap() {
+    setState(() {
+      mapKey = UniqueKey();
+    });
+    // Optional: Call your controller to move camera to current location
+    locationController.goToCurrentLocation();
+  }
+
   @override
   void initState() {
   super.initState();
@@ -53,6 +66,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             // Google Map with onTap handler
             Obx(() => GoogleMap(
+              key: mapKey,
               initialCameraPosition: initialPosition,
               mapType: mapDataChange.selectedMapType.value,
               myLocationEnabled: true,
@@ -145,6 +159,7 @@ class _HomePageState extends State<HomePage> {
               child: GestureDetector(
                 onTap: () {
                   Get.to(() => DirectionPage());
+                  refreshMap();
                 },
                 child: Container(
                   height: 60,
