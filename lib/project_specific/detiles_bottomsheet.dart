@@ -141,8 +141,8 @@ class PlaceDetailBottomSheet extends StatelessWidget {
                             _buildActionBtn(Icons.directions,
                                 "Directions",
                                 Colors.blue,
-                                (){
-                                   Get.to(()=>DirectionPage(passeddirection: place.name));
+                                    (){
+                                  Get.to(()=>DirectionPage(passeddirection: place.name));
                                 }),
                             _buildActionBtn(Icons.call, "Call", Colors.green, () {}),
                             _buildActionBtn(
@@ -311,41 +311,41 @@ class PlaceDetailBottomSheet extends StatelessWidget {
   }
 
 // સામાન્ય ઈમેજ ટાઈલ માટે
-Widget _buildImageTile(String url, {required int index, required List<String> allPhotos}) {
-  return GestureDetector(
-    onTap: () => Get.to(() => FullGalleryPage(photoUrls: allPhotos, initialIndex: index)),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.network(url, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
-    ),
-  );
-}
+  Widget _buildImageTile(String url, {required int index, required List<String> allPhotos}) {
+    return GestureDetector(
+      onTap: () => Get.to(() => FullGalleryPage(photoUrls: allPhotos, initialIndex: index)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(url, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
+      ),
+    );
+  }
 
 // 'More' વાળી ઈમેજ ટાઈલ માટે
-Widget _buildMoreTile(String url, {required int count, required List<String> allPhotos}) {
-  return GestureDetector(
-    onTap: () => Get.to(() => FullGalleryPage(photoUrls: allPhotos)),
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(url, fit: BoxFit.cover),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
+  Widget _buildMoreTile(String url, {required int count, required List<String> allPhotos}) {
+    return GestureDetector(
+      onTap: () => Get.to(() => FullGalleryPage(photoUrls: allPhotos)),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
             borderRadius: BorderRadius.circular(8),
+            child: Image.network(url, fit: BoxFit.cover),
           ),
-          child: Center(
-            child: Text(
-              "+$count",
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Center(
+              child: Text(
+                "+$count",
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:map_creted/controller/map_tap_info_controller.dart';
 
 import '../constant/ColorsConstant.dart';
 import '../controller/Suggestion_controller.dart';
@@ -9,7 +10,9 @@ import '../controller/current_location.dart';
 import '../controller/map_controller.dart';
 import '../controller/mapdataselector.dart';
 import '../controller/start_end_calculate_controller.dart'; // TwoMapRouteController
+import '../model/route_step_model.dart';
 import '../project_specific/contine_the_map_data.dart';
+import '../project_specific/direction_step_seet.dart';
 import '../project_specific/serch_location.dart';
 
 class DirectionPage extends StatefulWidget {
@@ -24,6 +27,7 @@ class _DirectionPageState extends State<DirectionPage> {
    TextEditingController _searchFirstPlace = TextEditingController();
   final TextEditingController _searchSecondPlace = TextEditingController();
   final TwoMapRouteController mapDataController = Get.put(TwoMapRouteController());
+  final MapTapInfoController mapinfoController = Get.put(MapTapInfoController());
   final ExpansionTileController _expansionController = ExpansionTileController();
    final CurrentLocationController locationController =
    Get.put(CurrentLocationController());
@@ -37,27 +41,30 @@ class _DirectionPageState extends State<DirectionPage> {
   // GlobalKey to control ExpansionTile state
   final GlobalKey _expansionTileKey = GlobalKey();
    final Key _mapKey = UniqueKey();
-  @override
-  void initState() {
-    super.initState();
-    Get.put(SuggestionController(), tag: 'start');
-    Get.put(SuggestionController(), tag: 'end');
-    Get.put(MapController());
-    if (widget.passeddirection != null && widget.passeddirection!.isNotEmpty) {
-      // Set starting location text
-      _searchFirstPlace.text = "Your Location";
+   @override
+   void initState() {
+     super.initState();
 
-      // Set destination location text
-      _searchSecondPlace.text = widget.passeddirection!;
+     Get.put(SuggestionController(), tag: 'start');
+     Get.put(SuggestionController(), tag: 'end');
+     Get.put(MapController());
 
-      // Update map points in controller
-      // true = starting point, false = destination
-      mapDataController.setPoint(_searchFirstPlace.text, true);
-      mapDataController.setPoint(_searchSecondPlace.text, false);
-    }
-    // Optional: auto-get current location as start
-    // mapDataController.getCurrentLocation();
-  }
+     _initializeData();
+   }
+
+   Future<void> _initializeData() async {
+     if (widget.passeddirection != null &&
+         widget.passeddirection!.isNotEmpty) {
+
+       _searchFirstPlace.text = "Your Location";
+       _searchSecondPlace.text = widget.passeddirection!;
+
+       print("passeddirection: ${widget.passeddirection}");
+
+       await mapDataController.setPoint(_searchFirstPlace.text, true);
+       await mapDataController.setPoint(_searchSecondPlace.text, false);
+     }
+   }
 
   void _collapsePanel() {
     if (_expansionController.isExpanded) {
@@ -221,6 +228,7 @@ class _DirectionPageState extends State<DirectionPage> {
                               await mapDataController.setPoint(endText, false);
 
                               _collapsePanel(); // auto collapse after search
+
                             },
                             icon: const Icon(Icons.directions_car, color: Colors.white),
                             label: const Text(
@@ -265,44 +273,7 @@ class _DirectionPageState extends State<DirectionPage> {
               ),
             ),
 
-            /// Distance & Duration Box
-            Obx(() {
-              if (mapDataController.distance.value.isEmpty ||
-                  mapDataController.duration.value.isEmpty) {
-                return const SizedBox.shrink();
-              }
 
-              return Positioned(
-                right: 16,
-                bottom: 20, // ↑ moved up a bit so it doesn't overlap back button on small screens
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColor.black.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColor.orange.withOpacity(0.4)),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Distance: ${mapDataController.distance.value}",
-                        style: TextStyle(color: AppColor.orange, fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "Time: ${mapDataController.duration.value}",
-                        style: TextStyle(color: AppColor.orange, fontSize: 16, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
           ],
         ),
       ),
@@ -373,6 +344,8 @@ class _DirectionPageState extends State<DirectionPage> {
               ),
             );
           }),
+
+
         ],
       ),
     );

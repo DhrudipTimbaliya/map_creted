@@ -1,93 +1,285 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_navigation/src/extension_navigation.dart';
+import 'package:get/get_rx/src/rx_types/rx_types.dart';
+import 'package:get/get_state_manager/src/simple/get_controllers.dart';
 
-import '../controller/show_direction.dart';
+import '../constant/ColorsConstant.dart';
+import '../model/route_step_model.dart';
+
+// Example GetX Controller
 
 
-class DirectionStepsSheet extends StatelessWidget {
-  const DirectionStepsSheet({super.key});
-  String removeHtmlTags(String htmlString) {
-    return htmlString.replaceAll(RegExp(r'<[^>]*>|&nbsp;'), ' ');
-  }
+enum TravelModeData { car, bicycle, walk, train, bus }
+
+class DirectionStepsBottomSheet extends StatefulWidget {
+  final RouteInfo data;
+  final TravelModeData? travelModedata;
+  const DirectionStepsBottomSheet({super.key, required this.travelModedata,required this.data});
+
+  @override
+  State<DirectionStepsBottomSheet> createState() => _DirectionStepsBottomSheetState();
+}
+
+class _DirectionStepsBottomSheetState extends State<DirectionStepsBottomSheet> {
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(ShowDirectionController());
-
     return DraggableScrollableSheet(
+      snap : false,
       initialChildSize: 0.5,
-      minChildSize: 0.3,
-      maxChildSize: 0.9,
-      expand: false, // આ ખાસ 'false' રાખવું, નહિતર શીટ દેખાશે નહીં
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
-            children: [
-              // ટોપ હેડર
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                width: 40, height: 5,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
-              ),
-              Obx(() => ListTile(
-                title: const Text("Steps", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-                subtitle: Text("${controller.totalDistance} • ${controller.totalDuration}"),
-                trailing: IconButton(icon: const Icon(Icons.close), onPressed: () => Get.back()),
-              )),
-              const Divider(),
+      maxChildSize: 0.85,
+      minChildSize: 0.15,
 
-              // સ્ટેપ્સની લિસ્ટ
-              Expanded(
-                child: Obx(() {
-
-                  if (controller.isStepLoading.value) return const Center(child: CircularProgressIndicator());
-                  return ListView.separated(
-                    controller: scrollController,
-                    itemCount: controller.steps.length,
-                    separatorBuilder: (context, index) => const Divider(indent: 70),
-                    itemBuilder: (context, index) {
-                      var step = controller.steps[index];
-                      return ListTile(
-                        leading: _getDirectionIcon(step['maneuver']),
-                        title: Text(
-                          removeHtmlTags(step['html_instructions']), // HTML ટેગ્સ કાઢીને ટેક્સ્ટ બતાવશે
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            step['distance']['text'],
-                            style: TextStyle(color: Colors.grey[600], fontSize: 13),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                }),
+      builder: (_, scrollController) => Container(
+        decoration:  BoxDecoration(
+          color: AppColor.black,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle & Header
+            _buildHandle(),
+            _buildHeader(widget.data.totalDistance, widget.data.totalDuration),
+            travelModeSelectorUI(selectedMode: widget.travelModedata!,), // Just displays the UI
+            SizedBox(height: 20),
+            Text("Select your travel mode here", style: TextStyle(color: AppColor.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            // Steps List
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: widget.data.steps.length,
+                itemBuilder: (context, index) {
+                  final step = widget.data.steps[index];
+                  return _buildStepTile(step, index == widget.data.steps.length - 1);
+                },
               ),
-            ],
-          ),
-        );
-      },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  // વળાંક મુજબ આઈકોન નક્કી કરવા
-  Widget _getDirectionIcon(String? maneuver) {
-    IconData icon;
+  Widget _buildStepTile(RouteStep step, bool isLast) {
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          const SizedBox(width: 20),
+          Column(
+            children: [
+              Icon(_getIcon(step.maneuver), color: Colors.blue),
+              if (!isLast) Expanded(child: VerticalDivider(color: Colors.grey[300])),
+            ],
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(step.instruction, style:  TextStyle(fontWeight: FontWeight.w600,color: AppColor.white)),
+                  Text("${step.distance} • ${step.duration}", style: const TextStyle(color: Colors.grey)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getIcon(String maneuver) {
+    if (maneuver.contains("left")) return Icons.turn_left;
+    if (maneuver.contains("right")) return Icons.turn_right;
+    return Icons.straight;
+  }
+
+// Add _buildHandle and _buildHeader UI methods here...
+  Widget _buildHandle() {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 12),
+        width: 40, height: 4,
+        decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Widget _buildHeader(String dist, String dur) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Route Steps", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 30, color: AppColor.orange)),
+              Text("$dist • $dur", style: TextStyle(color: Colors.grey[400])),
+
+            ],
+          ),
+          SizedBox(width: 170,),
+          IconButton(
+            icon:  Icon(Icons.more_vert,color: AppColor.white,),
+            onPressed: () {
+
+            }, // or Navigator.pop(context)
+          ),
+          IconButton(
+            icon:  Icon(Icons.close,color: AppColor.white,),
+            onPressed: () => Get.back(), // or Navigator.pop(context)
+          ),
+
+        ],
+      ),
+    );
+  }
+
+  // 3. Travel Modes Selection (Car, Bike, Walk)
+  Widget _buildTravelModes() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          _buildModeChip(Icons.directions_car, "24m", isActive: true),
+          _buildModeChip(Icons.directions_bike, "1h 12m"),
+          _buildModeChip(Icons.directions_walk, "3h 45m"),
+          _buildModeChip(Icons.directions_transit, "42m"),
+        ],
+      ),
+    );
+  }
+
+  // Helper for Circular Header Buttons
+  Widget _buildCircleIcon(IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: Colors.grey[800], size: 20),
+    );
+  }
+
+  // Helper for Vehicle Mode Chips
+  Widget _buildModeChip(IconData icon, String time, {bool isActive = false}) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isActive ? Colors.black : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isActive ? Colors.black : Colors.grey[300]!),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: isActive ? Colors.white : Colors.grey[600], size: 18),
+          const SizedBox(width: 8),
+          Text(
+            time,
+            style: TextStyle(
+              color: isActive ? Colors.white : Colors.grey[700],
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getStepIcon(String maneuver) {
     switch (maneuver) {
-      case 'turn-left': icon = Icons.turn_left; break;
-      case 'turn-right': icon = Icons.turn_right; break;
-      case 'merge': icon = Icons.merge; break;
-      default: icon = Icons.straight;
+      case 'turn-left':
+      case 'turn-slight-left':
+      case 'turn-sharp-left':
+        return Icons.turn_left;
+      case 'turn-right':
+      case 'turn-slight-right':
+      case 'turn-sharp-right':
+        return Icons.turn_right;
+      case 'u-turn-left':
+      case 'u-turn-right':
+        return Icons.u_turn_left;
+      case 'merge':
+        return Icons.merge;
+      case 'ramp-left':
+      case 'ramp-right':
+        return Icons.navigation;
+      default:
+        return Icons.straight; // Default for "head north" or "continue"
     }
-    return CircleAvatar(backgroundColor: Colors.blue.withOpacity(0.1), child: Icon(icon, color: Colors.blue));
+  }
+
+// Pure widget function: pass selectedMode, no controller
+  Widget travelModeSelectorUI({required TravelModeData selectedMode, Function(TravelModeData)? onTap}) {
+    final modes = {
+      TravelModeData.car: {'icon': Icons.directions_car, 'label': 'Car'},
+      TravelModeData.bicycle: {'icon': Icons.directions_bike, 'label': 'Bicycle'},
+      TravelModeData.walk: {'icon': Icons.directions_walk, 'label': 'Walk'},
+      TravelModeData.train: {'icon': Icons.train, 'label': 'Train'},
+      TravelModeData.bus: {'icon': Icons.directions_bus, 'label': 'Bus'},
+    };
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: modes.entries.map((entry) {
+          final isActive = selectedMode == entry.key;
+
+          return GestureDetector(
+            onTap: () {
+              if (onTap != null) onTap(entry.key);
+            },
+            child: Container(
+              margin: const EdgeInsets.only(right: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColor.black,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: isActive ? AppColor.orange : AppColor.Secondry),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.2),
+                    spreadRadius: 1,
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    entry.value['icon'] as IconData,
+                    color: isActive ? AppColor.orange : AppColor.Secondry,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    entry.value['label'] as String,
+                    style: TextStyle(
+                      color: isActive ? AppColor.orange : AppColor.Secondry,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
 }
+
+// Travel Mode Selector UI Function
+
+
+
+

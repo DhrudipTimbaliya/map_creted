@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:map_creted/controller/show_direction.dart';
+import 'package:map_creted/controller/bycycle_controller.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -150,21 +150,7 @@ class MapTapInfoController extends GetxController {
         width: 5,
       ));
     }
-    final showDirController = Get.isRegistered<ShowDirectionController>()
-        ? Get.find<ShowDirectionController>()
-        : Get.put(ShowDirectionController());
 
-    await showDirController.fetchDirections(
-      LatLng(currentPos.latitude, currentPos.longitude),
-      selectedLatLng.value!,
-    );
-
-    // ૩. ડાયરેક્શનની બોટમ શીટ ઓપન કરો
-    Get.bottomSheet(
-        const DirectionStepsSheet(),
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-    );
 
   }
 
