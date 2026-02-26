@@ -142,10 +142,9 @@ class ImageSelectedScreen extends StatelessWidget {
                   "Vehical  selected!",
                   backgroundColor: Colors.green,
                   colorText: Colors.white,
-                  snackPosition: SnackPosition.BOTTOM,
+                  snackPosition: SnackPosition.TOP,
                 );
-                // Optional: close screen
-                // Get.back();
+
                         },
                         label: const Text("Confirm"),
                         icon: const Icon(Icons.check),

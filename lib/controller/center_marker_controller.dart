@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
@@ -58,7 +59,9 @@ class CenterMarkerController extends GetxController {
       _moveCameraToCenterPosition(animate: false);
       _fetchAddressFromLatLng(centerPosition.value);
     } catch (e) {
-      debugPrint("Couldn't get current position: $e");
+      if (kDebugMode) {
+        debugPrint("Couldn't get current position: $e");
+      }
       // Fallback → already set to default (Ahmedabad)
       _fetchAddressFromLatLng(centerPosition.value);
     }
@@ -124,7 +127,9 @@ class CenterMarkerController extends GetxController {
         currentPincode.value = "—";
       }
     } catch (e) {
-      debugPrint("Reverse geocoding error: $e");
+      if (kDebugMode) {
+        debugPrint("Reverse geocoding error: $e");
+      }
       currentAddress.value = "Error fetching address";
       currentPincode.value = "—";
     } finally {

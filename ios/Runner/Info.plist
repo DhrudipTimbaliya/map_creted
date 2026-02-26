@@ -45,5 +45,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Location Permissions for GPS Tracking -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access to provide GPS tracking and navigation features.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs background location access to provide continuous GPS tracking during trips.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This app needs background location access to provide continuous GPS tracking during trips.</string>
 </dict>
 </plist>

@@ -10,9 +10,13 @@ import '../controller/current_location.dart';
 import '../controller/map_controller.dart';
 import '../controller/mapdataselector.dart';
 import '../controller/start_end_calculate_controller.dart'; // TwoMapRouteController
+import '../controller/vehicle_tracking_controller.dart';
+import '../controller/vehicalselecor_controller.dart';
+import '../api/directions_api_service.dart';
 import '../model/route_step_model.dart';
 import '../project_specific/contine_the_map_data.dart';
 import '../project_specific/direction_step_seet.dart';
+import '../project_specific/selected_vehical.dart';
 import '../project_specific/serch_location.dart';
 
 class DirectionPage extends StatefulWidget {
@@ -31,6 +35,12 @@ class _DirectionPageState extends State<DirectionPage> {
   final ExpansionTileController _expansionController = ExpansionTileController();
    final CurrentLocationController locationController =
    Get.put(CurrentLocationController());
+   
+  // Vehicle tracking controllers
+  final ImageSelectionController imageSelectionController = Get.put(ImageSelectionController());
+  final DirectionsApiService directionsApiService = Get.put(DirectionsApiService());
+  final VehicleTrackingController vehicleTrackingController = Get.put(VehicleTrackingController());
+   
   static const CameraPosition initialPosition = CameraPosition(
     target: LatLng(22.3039, 70.8022),
     zoom: 14,
@@ -85,21 +95,46 @@ class _DirectionPageState extends State<DirectionPage> {
           children: [
             /// MAP - full screen
             Obx(
-                  () => GoogleMap(
-                    key: _mapKey,
-                initialCameraPosition: initialPosition,
-                mapType: mapDataChange.selectedMapType.value,
-                myLocationEnabled: true,
-                zoomControlsEnabled: false,
-                markers: mapDataController.markers.value,
-                polylines: mapDataController.polylines.value,
-                onMapCreated: (controller) {
-                  mapDataController.mapController = controller;
-                  locationController.setMapController(controller);
-
-                },
-              ),
-            ),
+                  () {
+                    // Combine all markers: existing markers + vehicle marker
+                    Set<Marker> allMarkers = Set<Marker>.from(mapDataController.markers.value);
+                    
+                    // Add vehicle marker if tracking is active
+                    if (vehicleTrackingController.vehicleMarker.value != null) {
+                      allMarkers.add(vehicleTrackingController.vehicleMarker.value!);
+                    }
+                    
+                    // Combine all polylines: existing polylines + route polyline
+                    Set<Polyline> allPolylines = Set<Polyline>.from(mapDataController.polylines.value);
+                    
+                    // Add vehicle route polyline if available
+                    if (vehicleTrackingController.routePolyline.value != null) {
+                      allPolylines.add(vehicleTrackingController.routePolyline.value!);
+                    }
+                    
+                    return GoogleMap(
+                      key: _mapKey,
+                      initialCameraPosition: initialPosition,
+                      mapType: mapDataChange.selectedMapType.value,
+                      myLocationEnabled: true,
+                      zoomControlsEnabled: false,
+                      markers: allMarkers,
+                      polylines: allPolylines,
+                      onMapCreated: (GoogleMapController controller) {
+                        mapDataController.setMapController(controller);
+                        vehicleTrackingController.setMapController(controller);
+                      },
+                      onCameraMove: (CameraPosition position) {
+                        // Update zoom level for dynamic vehicle sizing
+                        vehicleTrackingController.currentZoom.value = position.zoom;
+                      },
+                      onCameraIdle: () {
+                        // Recalculate vehicle size when camera stops
+                        vehicleTrackingController.triggerZoomUpdate();
+                      },
+                    );
+                  }
+                ),
             Positioned(
               top: 90,
               right: 16,
@@ -135,10 +170,25 @@ class _DirectionPageState extends State<DirectionPage> {
                 ),
               ),
             ),
-
-
-
-
+            Positioned(
+              top: 210,
+              right: 16,
+              child: GestureDetector(
+                onTap: () {
+                  // Show vehicle tracking bottom sheet
+                  _showVehicleTrackingBottomSheet();
+                },
+                child: Container(
+                  height: 50,
+                  width: 60,
+                  decoration: BoxDecoration(
+                    color: AppColor.black.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(Icons.directions_car, color: AppColor.orange, size: 28),
+                ),
+              ),
+            ),
 
 
 
@@ -366,5 +416,323 @@ class _DirectionPageState extends State<DirectionPage> {
         ],
       ),
     );
+  }
+
+  // Vehicle Tracking Bottom Sheet
+  void _showVehicleTrackingBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.4,
+        minChildSize: 0.3,
+        maxChildSize: 0.8,
+        snap: true,
+        builder: (context, scrollController) {
+          return Container(
+            decoration: BoxDecoration(
+              color: AppColor.black,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              border: Border.all(color: AppColor.orange.withOpacity(0.3)),
+            ),
+            child: Column(
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColor.orange,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                
+                // Title
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.directions_car, color: AppColor.orange),
+                      SizedBox(width: 12),
+                      Text(
+                        "Vehicle Tracking",
+                        style: TextStyle(
+                          color: AppColor.orange,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.more_vert, color: AppColor.white),
+                        onPressed: () async {
+                          Get.to(()=>ImageSelectedScreen());
+                        },
+                      ),
+                      GestureDetector(
+                        onTap: () => Get.back(),
+                        child: Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                Divider(color: AppColor.orange.withOpacity(0.3)),
+                
+                // Vehicle Selection and Start Tracking
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Vehicle Selection Status
+                          Obx(() {
+                            if (!imageSelectionController.hasSelection) {
+                              return Container(
+                                padding: EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.orange[200]!),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.warning_amber, color: Colors.orange[700]),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "No Vehicle Selected",
+                                            style: TextStyle(
+                                              color: Colors.orange[700],
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(height: 4),
+                                          Text(
+                                            "Please select a vehicle image first to enable tracking",
+                                            style: TextStyle(
+                                              color: Colors.orange[600],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            } else {
+                              return Container(
+                                padding: EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.green[200]!),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Colors.green[700]),
+                                    SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "Vehicle Ready",
+                                            style: TextStyle(
+                                              color: Colors.green[700],
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(height: 4),
+                                          Text(
+                                            "Selected vehicle is ready for tracking",
+                                            style: TextStyle(
+                                              color: Colors.green[600],
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                          }),
+                          
+                          SizedBox(height: 20),
+                          
+                          // Start/Stop Tracking Button
+                          Obx(() {
+                            final isTracking = vehicleTrackingController.isTracking.value;
+                            
+                            return SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton.icon(
+                                onPressed: imageSelectionController.hasSelection
+                                    ? () {
+                                        if (isTracking) {
+                                          vehicleTrackingController.stopTrip();
+                                          Get.back();
+                                        } else {
+                                          _startVehicleTracking();
+                                        }
+                                      }
+                                    : null,
+                                icon: Icon(
+                                  isTracking ? Icons.stop : Icons.play_arrow,
+                                  color: Colors.white,
+                                ),
+                                label: Text(
+                                  isTracking ? "Stop Tracking" : "Start Tracking",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isTracking ? Colors.red : AppColor.Secondry,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                          
+                          SizedBox(height: 20),
+                          
+                          // Instructions
+                          Container(
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[900],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "How to use:",
+                                  style: TextStyle(
+                                    color: AppColor.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 8),
+                                ...[
+                                  "1. Select a vehicle image from vehicle selection",
+                                  "2. Set your destination in the directions panel",
+                                  "3. Click 'Start Tracking' to begin GPS tracking",
+                                  "4. Vehicle will follow the route automatically",
+                                  "5. Map will follow your vehicle in 3D view"
+                                ].map((instruction) => Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 2),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text("• ", style: TextStyle(color: AppColor.orange)),
+                                      Expanded(
+                                        child: Text(
+                                          instruction,
+                                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Start vehicle tracking with current route
+  void _startVehicleTracking() async {
+    try {
+      // Get current position as starting point
+      Position currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      
+      // Get destination from the search field
+      String destinationText = _searchSecondPlace.text.trim();
+      if (destinationText.isEmpty) {
+        Get.snackbar(
+          "Error",
+          "Please set a destination first",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+      
+      // For simplicity, we'll use a fixed destination or you can geocode the text
+      // Here we'll use the current route destination if available
+      LatLng? destination;
+      if (mapDataController.markers.value.length >= 2) {
+        final markers = mapDataController.markers.value.toList();
+        destination = markers[1].position; // Assuming second marker is destination
+      }
+      
+      if (destination == null) {
+        Get.snackbar(
+          "Error",
+          "No destination found. Please search for a destination first.",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+        return;
+      }
+      
+      // Start tracking
+      await vehicleTrackingController.startTrip(
+        startPosition: LatLng(currentPosition.latitude, currentPosition.longitude),
+      );
+      
+      // Fetch route to destination
+      await vehicleTrackingController.fetchRoute(
+        LatLng(currentPosition.latitude, currentPosition.longitude),
+        destination,
+      );
+      
+      Get.back(); // Close bottom sheet
+      
+      Get.snackbar(
+        "Tracking Started",
+        "Vehicle tracking is now active",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+      
+    } catch (e) {
+      Get.snackbar(
+        "Error",
+        "Failed to start tracking: $e",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 }

@@ -28,13 +28,12 @@ class _HomePageState extends State<HomePage> {
 
   final MapTapInfoController mapTapcontroller = Get.put(MapTapInfoController());
   final MapController mapController = Get.find<MapController>();
-  final CurrentLocationController locationController =
-  Get.put(CurrentLocationController());
+  final CurrentLocationController locationController = Get.put(CurrentLocationController());
+
   static const CameraPosition initialPosition = CameraPosition(
     target: LatLng(22.3039, 70.8022),
     zoom: 14,
   );
-
 
   // 1. Define a Key variable
   Key mapKey = UniqueKey();
@@ -50,13 +49,8 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void initState() {
-  super.initState();
-
- // ← once here
+    super.initState();
   }
-
-
-
 
   @override
   Widget build(BuildContext context) {

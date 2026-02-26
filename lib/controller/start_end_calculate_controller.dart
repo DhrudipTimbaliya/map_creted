@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -69,15 +70,29 @@ class TwoMapRouteController extends GetxController {
   final isLoadingVehicles = false.obs;
   final vehicles = <VehicleOption>[].obs;
 
+  // Enhanced route coordinates storage
+  List<LatLng>? _currentRouteCoordinates;
+
   // Polyline quality tuning
   static const double _maxSegmentDistanceMeters = 120000.0;
   static const int _maxWaypointCount = 5;
 
+  // ───────────────────────────────────────────────
+  //  MAP CONTROLLER MANAGEMENT
+  // ───────────────────────────────────────────────
+  void setMapController(GoogleMapController controller) {
+    mapController = controller;
+  }
+
   @override
   void onInit() {
     super.onInit();
-    _initializeController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeController();
+    });
+  }
 
+  void _initializeController() async {
     final converter = getLatLngFromAddress;
     _walkRouteController = Get.put(
       WalkRouteController(latLngFromAddress: converter, apiKey: apiKey),
@@ -91,13 +106,7 @@ class TwoMapRouteController extends GetxController {
     _trainRouteController = Get.put(
       TrainRouteController(latLngFromAddress: converter, apiKey: apiKey),
     );
-  }
 
-  // ---------------------------------------------------------------------------
-  // 2. INITIALIZATION & PERMISSIONS
-  // ---------------------------------------------------------------------------
-
-  Future<void> _initializeController() async {
     isMapLoading.value = true;
     final hasPermission = await _handleLocationPermission();
     if (hasPermission) {
@@ -221,7 +230,7 @@ class TwoMapRouteController extends GetxController {
     currentStepIndex.value = 0;
 
     try {
-      final url = _buildDirectionsUrl(
+      final url = _buildEnhancedDirectionsUrl(
         origin: start!,
         destination: end!,
         mode: travelMode.value,
@@ -247,7 +256,6 @@ class TwoMapRouteController extends GetxController {
       }
 
       final route = routes[0] as Map<String, dynamic>;
-
       final legs = route['legs'] as List?;
       if (legs == null || legs.isEmpty) {
         _showError("Invalid Route", "No legs in route");
@@ -259,18 +267,8 @@ class TwoMapRouteController extends GetxController {
       distance.value = (leg['distance'] as Map?)?['text'] as String? ?? 'Unknown';
       duration.value = (leg['duration'] as Map?)?['text'] as String? ?? 'Unknown';
 
-      final rawSteps = leg['steps'] as List?;
-      final parsedSteps = (rawSteps ?? []).map((dynamic s) {
-        final step = s as Map<String, dynamic>;
-        return RouteStep(
-          instruction: _stripHtml(step['html_instructions'] as String? ?? ''),
-          distance: (step['distance'] as Map?)?['text'] as String? ?? '',
-          duration: (step['duration'] as Map?)?['text'] as String? ?? '',
-          maneuver: step['maneuver'] as String? ?? 'straight',
-        );
-      }).toList();
-
-      steps.assignAll(parsedSteps);
+      // Process enhanced route data
+      await _processEnhancedRouteSteps(leg['steps'] as List);
 
       routeInfoData.value = RouteInfo(
         totalDistance: distance.value,
@@ -278,33 +276,320 @@ class TwoMapRouteController extends GetxController {
         steps: steps,
       );
 
-      final encoded = (route['overview_polyline'] as Map?)?['points'] as String?;
-      if (encoded == null || encoded.isEmpty) {
-        debugPrint("No polyline points returned");
-        return;
+      // Create enhanced polylines
+      await _createEnhancedPolylines();
+
+      if (!isNavigationStarted.value) {
+        _fitRouteToBounds();
       }
 
-      var polylinePoints = _decodePolyline(encoded);
+      _updateMarkers();
 
-      if (polylinePoints.length < 50 && _estimateDistance(start!, end!) > 200000) {
-        final improved = await _getImprovedPolylineForLongRoute(
-          start!,
-          end!,
-          travelMode.value,
-        );
-        if (improved != null && improved.isNotEmpty) {
-          polylinePoints = improved;
-        }
-      }
-
-      _drawPolylineOnMap(polylinePoints);
-      _zoomToFit();
-    } catch (e, stack) {
-      debugPrint("calculateAndDrawRoute failed: $e\n$stack");
-      _showError("Error", "Failed to load route");
+    } catch (e) {
+      debugPrint("Route calculation error: $e");
+      _showError("Route Error", "Failed to calculate route: $e");
     } finally {
       isLoadingRoute.value = false;
     }
+  }
+
+  /// Build enhanced directions API URL
+  String _buildEnhancedDirectionsUrl({
+    required LatLng origin,
+    required LatLng destination,
+    required String mode,
+    bool alternatives = false,
+  }) {
+    String transitParams = mode == "transit" ? "&departure_time=now" : "";
+
+    return "https://maps.googleapis.com/maps/api/directions/json?"
+        "origin=${origin.latitude},${origin.longitude}"
+        "&destination=${destination.latitude},${destination.longitude}"
+        "&mode=$mode"
+        "$transitParams"
+        "&alternatives=$alternatives"
+        "&avoid=highways|tolls"
+        "&units=metric"
+        "&key=$apiKey";
+  }
+
+  /// Process enhanced route steps with better polyline handling
+  Future<void> _processEnhancedRouteSteps(List<dynamic> routeSteps) async {
+    steps.clear();
+    List<LatLng> allCoordinates = [];
+
+    for (var stepData in routeSteps) {
+      final step = stepData as Map<String, dynamic>;
+
+      // Add enhanced step information
+      steps.add(RouteStep(
+        instruction: _cleanHtmlInstructions(step['html_instructions'] as String? ?? ''),
+        distance: (step['distance'] as Map?)?['text'] as String? ?? '',
+        duration: (step['duration'] as Map?)?['text'] as String? ?? '',
+        maneuver: step['maneuver'] as String? ?? 'straight',
+      ));
+
+      // Decode and enhance step polyline
+      final encoded = step['polyline']?['points'] as String?;
+      if (encoded != null && encoded.isNotEmpty) {
+        var stepPoints = _decodeEnhancedPolyline(encoded);
+        stepPoints = _smoothPolyline(stepPoints, smoothingFactor: 0.2);
+        stepPoints = _optimizePolyline(stepPoints, minDistance: 1.5);
+        allCoordinates.addAll(stepPoints);
+      }
+    }
+
+    // Store for polyline creation
+    _currentRouteCoordinates = allCoordinates;
+  }
+
+  /// Enhanced polyline decoder with better precision
+  List<LatLng> _decodeEnhancedPolyline(String encoded) {
+    if (encoded.isEmpty) return [];
+
+    List<LatLng> points = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      points.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+
+    return points;
+  }
+
+  /// Smooth polyline by adding intermediate points for curves
+  List<LatLng> _smoothPolyline(List<LatLng> points, {double smoothingFactor = 0.3}) {
+    if (points.length < 3) return points;
+
+    List<LatLng> smoothedPoints = [points.first];
+
+    for (int i = 1; i < points.length - 1; i++) {
+      LatLng prev = points[i - 1];
+      LatLng current = points[i];
+      LatLng next = points[i + 1];
+
+      // Calculate control points for smooth curve
+      double lat1 = prev.latitude + (current.latitude - prev.latitude) * smoothingFactor;
+      double lng1 = prev.longitude + (current.longitude - prev.longitude) * smoothingFactor;
+
+      double lat2 = current.latitude + (next.latitude - current.latitude) * smoothingFactor;
+      double lng2 = current.longitude + (next.longitude - current.longitude) * smoothingFactor;
+
+      // Add intermediate points for smooth curve
+      for (double t = 0.1; t <= 0.9; t += 0.2) {
+        double lat = _bezierInterpolate(prev.latitude, lat1, lat2, next.latitude, t);
+        double lng = _bezierInterpolate(prev.longitude, lng1, lng2, next.longitude, t);
+        smoothedPoints.add(LatLng(lat, lng));
+      }
+
+      smoothedPoints.add(current);
+    }
+
+    smoothedPoints.add(points.last);
+    return smoothedPoints;
+  }
+
+  /// Bezier interpolation for smooth curves
+  double _bezierInterpolate(double p0, double p1, double p2, double p3, double t) {
+    double u = 1 - t;
+    return (u * u * u * p0) + (3 * u * u * t * p1) + (3 * u * t * t * p2) + (t * t * t * p3);
+  }
+
+  /// Remove duplicate and very close points
+  List<LatLng> _optimizePolyline(List<LatLng> points, {double minDistance = 2.0}) {
+    if (points.isEmpty) return [];
+
+    List<LatLng> optimized = [points.first];
+
+    for (int i = 1; i < points.length; i++) {
+      double distance = _calculateDistance(optimized.last, points[i]);
+      if (distance >= minDistance) {
+        optimized.add(points[i]);
+      }
+    }
+
+    return optimized;
+  }
+
+  /// Calculate distance between two points
+  double _calculateDistance(LatLng point1, LatLng point2) {
+    const double earthRadius = 6371000; // Earth's radius in meters
+
+    double lat1Rad = point1.latitude * pi / 180;
+    double lat2Rad = point2.latitude * pi / 180;
+    double deltaLatRad = (point2.latitude - point1.latitude) * pi / 180;
+    double deltaLngRad = (point2.longitude - point1.longitude) * pi / 180;
+
+    double a = sin(deltaLatRad / 2) * sin(deltaLatRad / 2) +
+        cos(lat1Rad) * cos(lat2Rad) *
+        sin(deltaLngRad / 2) * sin(deltaLngRad / 2);
+    double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+
+    return earthRadius * c; // Distance in meters
+  }
+
+  /// Create enhanced polylines with travel mode-based styling
+  Future<void> _createEnhancedPolylines() async {
+    if (_currentRouteCoordinates == null || _currentRouteCoordinates!.isEmpty) return;
+
+    polylines.clear();
+
+    // Get styling based on travel mode
+    Color routeColor = _getPolylineColorForMode(travelMode.value);
+    double routeWidth = _getPolylineWidthForMode(travelMode.value);
+    List<PatternItem> pattern = _getPolylinePatternForMode(travelMode.value);
+
+    // Create main route polyline with mode-specific styling
+    Polyline mainRoute = Polyline(
+      polylineId: const PolylineId("enhanced_main_route"),
+      points: _currentRouteCoordinates!,
+      color: routeColor,
+      width: routeWidth.toInt(),
+      jointType: JointType.round,
+      startCap: Cap.roundCap,
+      endCap: Cap.roundCap,
+      geodesic: true,
+      patterns: pattern,
+    );
+
+    polylines.add(mainRoute);
+
+    // Create route border for better visibility (only for solid lines)
+    if (pattern.isEmpty) {
+      Polyline borderRoute = Polyline(
+        polylineId: const PolylineId("enhanced_route_border"),
+        points: _currentRouteCoordinates!,
+        color: const Color(0xFF1976D2), // Material Blue
+        width: (routeWidth + 2).toInt(),
+        jointType: JointType.round,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+        geodesic: true,
+      );
+
+      polylines.add(borderRoute);
+    }
+  }
+
+  /// Get polyline pattern based on travel mode
+  List<PatternItem> _getPolylinePatternForMode(String travelMode) {
+    switch (travelMode.toLowerCase()) {
+      case 'driving':
+        // Solid line for car mode - no pattern
+        return [];
+      case 'walking':
+        // Dotted/dashed line for walking mode
+        return [
+          PatternItem.dash(10),
+          PatternItem.gap(8),
+        ];
+      case 'transit':
+        // Styled line for train/transit mode
+        return [
+          PatternItem.dash(20),
+          PatternItem.gap(5),
+        ];
+      default:
+        // Default to solid line
+        return [];
+    }
+  }
+
+  /// Get polyline color based on travel mode
+  Color _getPolylineColorForMode(String travelMode) {
+    switch (travelMode.toLowerCase()) {
+      case 'driving':
+        return const Color(0xFF2196F3); // Material Blue
+      case 'walking':
+        return const Color(0xFF4CAF50); // Green for walking
+      case 'transit':
+        return const Color(0xFF9C27B0); // Purple for transit
+      default:
+        return const Color(0xFF2196F3); // Default blue
+    }
+  }
+
+  /// Get polyline width based on travel mode
+  double _getPolylineWidthForMode(String travelMode) {
+    switch (travelMode.toLowerCase()) {
+      case 'driving':
+        return 4.0; // Reduced thickness for driving
+      case 'walking':
+        return 3.0; // Reduced thickness for walking
+      case 'transit':
+        return 3.5; // Reduced thickness for transit
+      default:
+        return 4.0; // Default reduced thickness
+    }
+  }
+
+  /// Calculate optimal polyline width based on zoom level
+  double _calculateOptimalPolylineWidth() {
+    // Default width for general use
+    return 4.0;
+    return 8.0;
+  }
+
+  /// Clean HTML instructions
+  String _cleanHtmlInstructions(String html) {
+    return html
+        .replaceAll(RegExp(r'<[^>]*>'), '') // Remove HTML tags
+        .replaceAll(RegExp(r'&[^;]+;'), '') // Remove HTML entities
+        .replaceAll(RegExp(r'\s+'), ' ') // Normalize whitespace
+        .trim();
+  }
+
+  /// Fit route to map bounds
+  void _fitRouteToBounds() async {
+    if (mapController == null || _currentRouteCoordinates == null || _currentRouteCoordinates!.isEmpty) return;
+
+    // Calculate bounds
+    double minLat = _currentRouteCoordinates!.first.latitude;
+    double maxLat = _currentRouteCoordinates!.first.latitude;
+    double minLng = _currentRouteCoordinates!.first.longitude;
+    double maxLng = _currentRouteCoordinates!.first.longitude;
+
+    for (var point in _currentRouteCoordinates!) {
+      minLat = math.min(minLat, point.latitude);
+      maxLat = math.max(maxLat, point.latitude);
+      minLng = math.min(minLng, point.longitude);
+      maxLng = math.max(maxLng, point.longitude);
+    }
+
+    // Create bounds with padding
+    LatLngBounds bounds = LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+
+    // Animate camera to fit bounds
+    await mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(bounds, 100), // 100px padding as int
+    );
   }
 
   Future<void> _updateRouteByMode() async {

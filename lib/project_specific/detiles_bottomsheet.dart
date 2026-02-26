@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:map_creted/constant/ColorsConstant.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../Pages/direction_page.dart';
 import '../controller/map_tap_info_controller.dart';
+import '../controller/vehicle_tracking_controller.dart';
+import '../controller/vehicalselecor_controller.dart';
+import '../api/directions_api_service.dart';
 import 'gallary_images.dart';
 
 class PlaceDetailBottomSheet extends StatelessWidget {
@@ -165,6 +169,9 @@ class PlaceDetailBottomSheet extends StatelessWidget {
                           ],
                         ),
                         const Divider(height: 30),
+                        
+                        // Start Trip Section
+                        _buildStartTripSection(place),
 
                         const Text(
                           "Reviews",
@@ -263,6 +270,177 @@ class PlaceDetailBottomSheet extends StatelessWidget {
         );
       },
     );
+  }
+  
+  // Start Trip Section
+  Widget _buildStartTripSection(dynamic place) {
+    VehicleTrackingController? trackingController;
+    ImageSelectionController? imageController;
+    
+    try {
+      trackingController = Get.find<VehicleTrackingController>();
+    } catch (e) {
+      // VehicleTrackingController not available (not in DirectionPage)
+    }
+    
+    try {
+      imageController = Get.find<ImageSelectionController>();
+    } catch (e) {
+      // ImageSelectionController not available
+    }
+    
+    // If we're not in DirectionPage, don't show vehicle tracking section
+    if (trackingController == null || imageController == null) {
+      return const SizedBox.shrink();
+    }
+    
+    return Obx(() {
+      // Check if vehicle is selected
+      if (!imageController!.hasSelection) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.orange[50],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.orange[200]!),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.warning_amber, color: Colors.orange[700]),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Please select a vehicle first',
+                  style: TextStyle(color: Colors.orange[700]),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  // Navigate to vehicle selection
+                  Get.back(); // Close bottom sheet first
+                  // TODO: Navigate to vehicle selection screen
+                },
+                child: Text('Select Vehicle', style: TextStyle(color: Colors.orange[700])),
+              ),
+            ],
+          ),
+        );
+      }
+      
+      // Show start/stop trip button
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: trackingController?.isTracking.value == true ? Colors.red[50] : Colors.green[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: trackingController?.isTracking.value == true ? Colors.red[200]! : Colors.green[200]!,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  trackingController?.isTracking.value == true ? Icons.stop_circle : Icons.play_circle,
+                  color: trackingController?.isTracking.value == true ? Colors.red[700] : Colors.green[700],
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    trackingController?.isTracking.value == true ? 'Trip in Progress' : 'Start Your Trip',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: trackingController?.isTracking.value == true ? Colors.red[700] : Colors.green[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            if (trackingController?.isTracking.value == true) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.speed, color: Colors.grey[600], size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Live tracking active',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.gps_fixed, color: Colors.grey[600], size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    'GPS Connected',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+            ],
+            
+            const SizedBox(height: 12),
+            
+            // Start/Stop Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (trackingController?.isTracking.value == true) {
+                    await trackingController!.stopTrip();
+                  } else {
+                    // Get destination coordinates
+                    final destination = LatLng(
+                      place.latitude ?? 0.0,
+                      place.longitude ?? 0.0,
+                    );
+                    
+                    if (destination.latitude == 0.0 || destination.longitude == 0.0) {
+                      Get.snackbar('Error', 'Destination coordinates not available');
+                      return;
+                    }
+                    
+                    // Fetch route and start trip
+                    try {
+                      final directionsService = Get.find<DirectionsApiService>();
+                      final routeCoordinates = await directionsService.getDirections(
+                        origin: trackingController!.currentVehiclePosition.value,
+                        destination: destination,
+                      );
+                      
+                      await trackingController.startTrip(
+                        routeCoords: routeCoordinates,
+                      );
+                    } catch (e) {
+                      // Fallback: start trip without route
+                      await trackingController!.startTrip(startPosition: destination);
+                    }
+                  }
+                },
+                icon: Icon(
+                  trackingController?.isTracking.value == true ? Icons.stop : Icons.play_arrow,
+                  color: Colors.white,
+                ),
+                label: Text(
+                  trackingController?.isTracking.value == true ? 'Stop Trip' : 'Start Trip',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: trackingController?.isTracking.value == true ? Colors.red : Colors.green,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   // _buildStatusBadge અને _buildActionBtn પદ્ધતિઓ તમારા જૂના કોડ મુજબ જ રહેશે...

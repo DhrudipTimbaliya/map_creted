@@ -67,36 +67,7 @@ class _DirectionStepsBottomSheetState extends State<DirectionStepsBottomSheet> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Start button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 44,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        await routeController.startNavigation();
-                      },
-                      // icon: Icon(
-                      //   _VehicleSelectionSheet()._iconForMode(mode),
-                      //   size: 20,
-                      // ),
-                      label: Text(
-                        "Start",
-                        style: TextStyle(
-                          color: AppColor.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColor.Secondry,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                //
                 const SizedBox(height: 12),
                 // Steps List
                 Expanded(
@@ -177,12 +148,6 @@ class _DirectionStepsBottomSheetState extends State<DirectionStepsBottomSheet> {
             ],
           ),
           const Spacer(),
-          IconButton(
-            icon: Icon(Icons.more_vert, color: AppColor.white),
-            onPressed: () async {
-                   Get.to(()=>ImageSelectedScreen());
-            },
-          ),
           IconButton(
             icon:  Icon(Icons.close,color: AppColor.white,),
             onPressed: () => Get.back(), // or Navigator.pop(context)
