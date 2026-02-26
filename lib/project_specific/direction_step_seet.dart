@@ -1,17 +1,21 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get_core/src/get_main.dart';
+import 'package:get/get_instance/src/extension_instance.dart';
 import 'package:get/get_navigation/src/extension_navigation.dart';
 import 'package:get/get_rx/src/rx_types/rx_types.dart';
+import 'package:get/get_state_manager/src/rx_flutter/rx_obx_widget.dart';
 import 'package:get/get_state_manager/src/simple/get_controllers.dart';
+import 'package:map_creted/project_specific/selected_vehical.dart';
 
 import '../constant/ColorsConstant.dart';
 import '../model/route_step_model.dart';
+import '../controller/start_end_calculate_controller.dart';
 
 // Example GetX Controller
 
 
-enum TravelModeData { car, bicycle, walk, train, bus }
+enum TravelModeData { car, walk, train }
 
 class DirectionStepsBottomSheet extends StatefulWidget {
   final RouteInfo data;
@@ -25,39 +29,91 @@ class DirectionStepsBottomSheet extends StatefulWidget {
 class _DirectionStepsBottomSheetState extends State<DirectionStepsBottomSheet> {
   @override
   Widget build(BuildContext context) {
+    final routeController = Get.find<TwoMapRouteController>();
+
     return DraggableScrollableSheet(
-      snap : false,
+      snap: false,
       initialChildSize: 0.5,
       maxChildSize: 0.85,
       minChildSize: 0.15,
+      builder: (_, scrollController) {
+        return Obx(() {
+          final route = routeController.routeInfoData.value ?? widget.data;
+          final mode = routeController.selectedMode.value;
 
-      builder: (_, scrollController) => Container(
-        decoration:  BoxDecoration(
-          color: AppColor.black,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            // Handle & Header
-            _buildHandle(),
-            _buildHeader(widget.data.totalDistance, widget.data.totalDuration),
-            travelModeSelectorUI(selectedMode: widget.travelModedata!,), // Just displays the UI
-            SizedBox(height: 20),
-            Text("Select your travel mode here", style: TextStyle(color: AppColor.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            // Steps List
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                itemCount: widget.data.steps.length,
-                itemBuilder: (context, index) {
-                  final step = widget.data.steps[index];
-                  return _buildStepTile(step, index == widget.data.steps.length - 1);
-                },
-              ),
+          return Container(
+            decoration: BoxDecoration(
+              color: AppColor.black,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-          ],
-        ),
-      ),
+            child: Column(
+              children: [
+                // Handle & Header
+                _buildHandle(),
+                _buildHeader(route.totalDistance, route.totalDuration),
+                travelModeSelectorUI(
+                  selectedMode: mode,
+                  onTap: (m) {
+                    routeController.changeTravelMode(m);
+                  },
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  "Select your travel mode here",
+                  style: TextStyle(
+                    color: AppColor.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Start button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        await routeController.startNavigation();
+                      },
+                      // icon: Icon(
+                      //   _VehicleSelectionSheet()._iconForMode(mode),
+                      //   size: 20,
+                      // ),
+                      label: Text(
+                        "Start",
+                        style: TextStyle(
+                          color: AppColor.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColor.Secondry,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Steps List
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: route.steps.length,
+                    itemBuilder: (context, index) {
+                      final step = route.steps[index];
+                      return _buildStepTile(step, index == route.steps.length - 1);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
     );
   }
 
@@ -118,15 +174,14 @@ class _DirectionStepsBottomSheetState extends State<DirectionStepsBottomSheet> {
             children: [
               Text("Route Steps", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 30, color: AppColor.orange)),
               Text("$dist • $dur", style: TextStyle(color: Colors.grey[400])),
-
             ],
           ),
-          SizedBox(width: 170,),
+          const Spacer(),
           IconButton(
-            icon:  Icon(Icons.more_vert,color: AppColor.white,),
-            onPressed: () {
-
-            }, // or Navigator.pop(context)
+            icon: Icon(Icons.more_vert, color: AppColor.white),
+            onPressed: () async {
+                   Get.to(()=>ImageSelectedScreen());
+            },
           ),
           IconButton(
             icon:  Icon(Icons.close,color: AppColor.white,),
@@ -220,10 +275,8 @@ class _DirectionStepsBottomSheetState extends State<DirectionStepsBottomSheet> {
   Widget travelModeSelectorUI({required TravelModeData selectedMode, Function(TravelModeData)? onTap}) {
     final modes = {
       TravelModeData.car: {'icon': Icons.directions_car, 'label': 'Car'},
-      TravelModeData.bicycle: {'icon': Icons.directions_bike, 'label': 'Bicycle'},
       TravelModeData.walk: {'icon': Icons.directions_walk, 'label': 'Walk'},
       TravelModeData.train: {'icon': Icons.train, 'label': 'Train'},
-      TravelModeData.bus: {'icon': Icons.directions_bus, 'label': 'Bus'},
     };
 
     return SingleChildScrollView(
@@ -277,9 +330,3 @@ class _DirectionStepsBottomSheetState extends State<DirectionStepsBottomSheet> {
     );
   }
 }
-
-// Travel Mode Selector UI Function
-
-
-
-

@@ -272,7 +272,25 @@ class _DirectionPageState extends State<DirectionPage> {
                 ),
               ),
             ),
-
+            if(mapDataController.routeInfoData.value!=null)
+            Positioned(
+              right: 16,
+              bottom: 20,   // ← adjust this value higher if still blocking
+              child: SizedBox(
+                width: 300,
+                child: FloatingActionButton(
+                  onPressed: mapDataController.showStepsBottomSheet,
+                  backgroundColor: AppColor.black,
+                  child:  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Icon(Icons.route_rounded, color: AppColor.orange),
+                      Text("Find Steps",style: TextStyle(color: AppColor.orange,fontSize: 22),),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           ],
         ),
@@ -344,7 +362,6 @@ class _DirectionPageState extends State<DirectionPage> {
               ),
             );
           }),
-
 
         ],
       ),

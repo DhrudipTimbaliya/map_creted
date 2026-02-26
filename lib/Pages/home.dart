@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:map_creted/Pages/pinset_page.dart';
 import 'package:map_creted/constant/ColorsConstant.dart';
 import 'package:map_creted/project_specific/serch_location.dart';
 
@@ -102,6 +103,25 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(Icons.my_location, color: AppColor.orange, size: 28),
+                ),
+              ),
+            ),
+
+            Positioned(
+              top: 210,
+              right: 16,
+              child: GestureDetector(
+                onTap: () {
+                 Get.to(()=>PinSetPage());
+                },
+                child: Container(
+                  height: 50,
+                  width: 60,
+                  decoration: BoxDecoration(
+                    color: AppColor.black.withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(Icons.not_listed_location_sharp, color: AppColor.orange, size: 28),
                 ),
               ),
             ),
