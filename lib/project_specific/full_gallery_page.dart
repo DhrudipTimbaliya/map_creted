@@ -44,7 +44,7 @@ class FullGalleryPage extends StatelessWidget {
                             child: Image.network(
                               photoUrls[index],
                               width: double.infinity,
-                              fit: BoxFit.contain, // આ પ્રોપર્ટી ફોટાને સેન્ટરમાં એડજસ્ટ કરશે
+                              fit: BoxFit.contain, // આ પ્રોપર્ટી ફોટોને સેન્ટરમાં એડજસ્ટ કરશે
                               loadingBuilder: (context, child, loadingProgress) {
                                 if (loadingProgress == null) return child;
                                 return const Center(child: CircularProgressIndicator(color: Colors.white));

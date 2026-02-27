@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart' as dio_pkg;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -5,11 +6,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:dio/dio.dart' as dio_pkg;
 
 import '../api/place_serviece.dart';
 import '../model/place_model.dart';
-import '../project_specific/direction_step_seet.dart';
 import 'map_controller.dart';
 
 class MapTapInfoController extends GetxController {
@@ -122,38 +121,4 @@ class MapTapInfoController extends GetxController {
     selectedPlace.value = null;
     selectedLatLng.value = null;
   }
-
-  Future<void> drawRouteToPlace() async {
-    if (selectedLatLng.value == null) return;
-
-    Position? currentPos = await getCurrentLocation();
-    if (currentPos == null) return;
-
-    PolylinePoints polylinePoints = PolylinePoints();
-    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      googleApiKey: _placesService.apiKey,
-      request: PolylineRequest(
-        origin: PointLatLng(currentPos.latitude, currentPos.longitude),
-        destination: PointLatLng(selectedLatLng.value!.latitude, selectedLatLng.value!.longitude),
-        mode: TravelMode.driving,
-      ),
-    );
-
-    if (result.points.isNotEmpty) {
-      List<LatLng> polylineCoordinates = result.points.map((p) => LatLng(p.latitude, p.longitude)).toList();
-      polylines.clear(); // જૂનો રસ્તો સાફ કરો
-      polylines.add(Polyline(
-        polylineId: const PolylineId("route"),
-        color: const Color(0xFF2196F3),
-        points: polylineCoordinates,
-        width: 5,
-      ));
-    }
-
-
-  }
-
-
-
-
 }

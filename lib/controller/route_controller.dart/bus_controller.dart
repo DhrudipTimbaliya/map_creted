@@ -7,7 +7,7 @@ import '../../model/route_step_model.dart';
 
 typedef LatLngFromAddress = Future<LatLng?> Function(String address);
 
-class BusRouteController extends GetxController {
+class BusRouteController extends GetxController{
   final LatLngFromAddress latLngFromAddress;
   final String apiKey;
 

@@ -8,8 +8,6 @@ import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-
-// Internal Project Imports
 import '../constant/ColorsConstant.dart';
 import '../model/route_step_model.dart';
 import '../project_specific/direction_step_seet.dart';

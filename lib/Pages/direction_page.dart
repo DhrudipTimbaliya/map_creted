@@ -12,11 +12,10 @@ import '../controller/mapdataselector.dart';
 import '../controller/start_end_calculate_controller.dart'; // TwoMapRouteController
 import '../controller/vehicle_tracking_controller.dart';
 import '../controller/vehicalselecor_controller.dart';
-import '../api/directions_api_service.dart';
 import '../model/route_step_model.dart';
 import '../project_specific/contine_the_map_data.dart';
 import '../project_specific/direction_step_seet.dart';
-import '../project_specific/selected_vehical.dart';
+import '../project_specific/image_selected_screen.dart';
 import '../project_specific/serch_location.dart';
 
 class DirectionPage extends StatefulWidget {
@@ -38,7 +37,6 @@ class _DirectionPageState extends State<DirectionPage> {
    
   // Vehicle tracking controllers
   final ImageSelectionController imageSelectionController = Get.put(ImageSelectionController());
-  final DirectionsApiService directionsApiService = Get.put(DirectionsApiService());
   final VehicleTrackingController vehicleTrackingController = Get.put(VehicleTrackingController());
    
   static const CameraPosition initialPosition = CameraPosition(
@@ -468,7 +466,7 @@ class _DirectionPageState extends State<DirectionPage> {
                       IconButton(
                         icon: Icon(Icons.more_vert, color: AppColor.white),
                         onPressed: () async {
-                          Get.to(()=>ImageSelectedScreen());
+                          Get.to(() => ImageSelectedScreen());
                         },
                       ),
                       GestureDetector(

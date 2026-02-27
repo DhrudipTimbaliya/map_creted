@@ -4,11 +4,12 @@ import 'package:map_creted/constant/ColorsConstant.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../Pages/direction_page.dart';
+import '../project_specific/full_gallery_page.dart';
+import '../project_specific/serch_location.dart';
 import '../controller/map_tap_info_controller.dart';
 import '../controller/vehicle_tracking_controller.dart';
 import '../controller/vehicalselecor_controller.dart';
-import '../api/directions_api_service.dart';
-import 'gallary_images.dart';
+
 
 class PlaceDetailBottomSheet extends StatelessWidget {
   const PlaceDetailBottomSheet({super.key});
@@ -403,21 +404,8 @@ class PlaceDetailBottomSheet extends StatelessWidget {
                       return;
                     }
                     
-                    // Fetch route and start trip
-                    try {
-                      final directionsService = Get.find<DirectionsApiService>();
-                      final routeCoordinates = await directionsService.getDirections(
-                        origin: trackingController!.currentVehiclePosition.value,
-                        destination: destination,
-                      );
-                      
-                      await trackingController.startTrip(
-                        routeCoords: routeCoordinates,
-                      );
-                    } catch (e) {
-                      // Fallback: start trip without route
-                      await trackingController!.startTrip(startPosition: destination);
-                    }
+                    // Fallback: start trip without route
+                    await trackingController!.startTrip(startPosition: destination);
                   }
                 },
                 icon: Icon(
@@ -491,7 +479,9 @@ class PlaceDetailBottomSheet extends StatelessWidget {
 // સામાન્ય ઈમેજ ટાઈલ માટે
   Widget _buildImageTile(String url, {required int index, required List<String> allPhotos}) {
     return GestureDetector(
-      onTap: () => Get.to(() => FullGalleryPage(photoUrls: allPhotos, initialIndex: index)),
+      onTap: () {
+        Get.to(() => FullGalleryPage(photoUrls: allPhotos, initialIndex: index));
+      },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
         child: Image.network(url, fit: BoxFit.cover, width: double.infinity, height: double.infinity),
@@ -502,7 +492,9 @@ class PlaceDetailBottomSheet extends StatelessWidget {
 // 'More' વાળી ઈમેજ ટાઈલ માટે
   Widget _buildMoreTile(String url, {required int count, required List<String> allPhotos}) {
     return GestureDetector(
-      onTap: () => Get.to(() => FullGalleryPage(photoUrls: allPhotos)),
+      onTap: () {
+        Get.to(() => FullGalleryPage(photoUrls: allPhotos));
+      },
       child: Stack(
         fit: StackFit.expand,
         children: [

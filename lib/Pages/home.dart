@@ -23,29 +23,16 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController _serchplace = TextEditingController();
-  final MapController findPLaceController = Get.put(MapController());
+  final MapController mapController = Get.put(MapController());
   final mapDataChange = Get.put(MapDataSelectedController());
 
   final MapTapInfoController mapTapcontroller = Get.put(MapTapInfoController());
-  final MapController mapController = Get.find<MapController>();
   final CurrentLocationController locationController = Get.put(CurrentLocationController());
 
   static const CameraPosition initialPosition = CameraPosition(
     target: LatLng(22.3039, 70.8022),
     zoom: 14,
   );
-
-  // 1. Define a Key variable
-  Key mapKey = UniqueKey();
-
-  // 2. Create a function to refresh the map
-  void refreshMap() {
-    setState(() {
-      mapKey = UniqueKey();
-    });
-    // Optional: Call your controller to move camera to current location
-    locationController.goToCurrentLocation();
-  }
 
   @override
   void initState() {
@@ -61,14 +48,13 @@ class _HomePageState extends State<HomePage> {
           children: [
             // Google Map with onTap handler
             Obx(() => GoogleMap(
-              key: mapKey,
+              markers: mapController.markers.toSet(),
               initialCameraPosition: initialPosition,
               mapType: mapDataChange.selectedMapType.value,
               myLocationEnabled: true,
               zoomControlsEnabled: false,
-              markers: findPLaceController.markers.toSet(),
               onMapCreated: (controller) {
-                findPLaceController.setMapController(controller);
+                mapController.setMapController(controller);
                 locationController.setMapController(controller);
               },
               onTap: (LatLng latLng) {
@@ -173,7 +159,6 @@ class _HomePageState extends State<HomePage> {
               child: GestureDetector(
                 onTap: () {
                   Get.to(() => DirectionPage());
-                  refreshMap();
                 },
                 child: Container(
                   height: 60,
@@ -186,12 +171,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            // 2. Bottom Sheet Overlay
-            Obx(() => mapTapcontroller.isBottomSheetOpen.value
-                ? const PlaceDetailBottomSheet()
-                : const SizedBox.shrink()),
-
-            // 2. Bottom Sheet Overlay (ફક્ત શીટ જ આવશે, બટન નહીં)
+            // Bottom Sheet Overlay
             Obx(() => mapTapcontroller.isBottomSheetOpen.value
                 ? const PlaceDetailBottomSheet()
                 : const SizedBox.shrink()),

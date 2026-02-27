@@ -1,4 +1,4 @@
-// file: screens/image_selected_screen.dart  (or put in bottom sheet / dialog)
+// file: screens/image_selected_screen.dart
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:map_creted/constant/ColorsConstant.dart';
@@ -18,7 +18,7 @@ class ImageSelectedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get the controller (make sure it's put somewhere: Get.put(ImageSelectionController()))
+    // Get controller (make sure it's put somewhere: Get.put(ImageSelectionController()))
     final controller = Get.put(ImageSelectionController());
 
     return Scaffold(

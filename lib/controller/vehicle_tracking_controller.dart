@@ -98,6 +98,12 @@ class VehicleTrackingController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    
+    // Set default vehicle on startup if none selected
+    if (!imageController.hasSelection) {
+      imageController.selectImage('assets/images/car.png');
+    }
+    
     _initializeVehicleMarker();
   }
   
